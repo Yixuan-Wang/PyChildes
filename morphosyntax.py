@@ -236,7 +236,7 @@ def parse_morphological(content: str) -> list[tuple[int, MorphoComponent]]:
         ready as the argument for `networkx.DiGraph.add_nodes_from()`.
     """
     list_morph = []
-    index_morph = 0
+    index_morph = 1
     for index_word, mor_word in enumerate(content.split(' '), start=1):
         for index_clitic, mor_clitic in enumerate(
             RE_SPLIT_CLITIC.split(mor_word), start=1
@@ -245,5 +245,6 @@ def parse_morphological(content: str) -> list[tuple[int, MorphoComponent]]:
                 mor_clitic, index_word=index_word, index_clitic=index_clitic
             )
             list_morph.append((index_morph, component))
+            index_morph += 1
 
     return list_morph
