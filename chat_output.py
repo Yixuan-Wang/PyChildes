@@ -140,8 +140,21 @@ class ChatSinkJSON(ChatSink):
             }
         elif turn.utt:
             kind = 'utterance'
+
+            # TODO: Now hard code to output graph data
+            if turn.grammatical_relations and turn.morphological:
+                graph = {
+                    'graph': {
+                        'nodes': turn.morphological,
+                        'edges': turn.grammatical_relations,
+                    }
+                }
+            else:
+                graph = {}
+
             content = {
                 'content': list(map(str.strip, turn.to_list())),
+                **graph,
             }
         else:
             # Skip unknown/empty turns

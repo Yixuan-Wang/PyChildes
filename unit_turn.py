@@ -1,6 +1,13 @@
 """Module for `UnitTurn`, which represents a unit of utterance with its surrounding environmental context."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from utils import DataIntegrityError
+
+if TYPE_CHECKING:
+    from morphosyntax import GrammaticalRelation, MorphoComponent
 
 
 class UnitTurn:
@@ -55,6 +62,16 @@ class UnitTurn:
     Environmental events occurring after the utterance.\
     """
 
+    grammatical_relations: list[tuple[int, int, GrammaticalRelation]]
+    """\
+    Grammatical relations (edges in dependency grammar) associated with the utterance.\
+    """
+
+    morphological: list[tuple[int, MorphoComponent]]
+    """\
+    Morphological components (vertices in dependency grammar) associated with the utterance.\
+    """
+
     def __init__(self) -> None:
         """Initialize UnitUtterance with empty lists for utterance and environmental context.
 
@@ -68,6 +85,9 @@ class UnitTurn:
         self.env_bef = []
         self.env_dur = []
         self.env_aft = []
+
+        self.grammatical_relations = []
+        self.morphological = []
 
     def update(self, content: str, attribute: str) -> None:
         """Append content to the specified class attribute if it exists.
@@ -111,3 +131,13 @@ class UnitTurn:
         output.extend(self.utt)
         output.extend(self.env_aft)
         return output
+
+    def to_morphosyntax_graph(self) -> tuple[list[tuple[int, MorphoComponent]], list[tuple[int, int, GrammaticalRelation]]]:
+        """Get the morphological components and grammatical relations.
+
+        Returns:
+            morphosyntax_graph: A tuple containing two lists:
+            - The first list contains morphological components as tuples of (index, MorphoComponent).
+            - The second list contains grammatical relations as tuples of (from_index, to_index, GrammaticalRelation).
+        """
+        return self.morphological, self.grammatical_relations

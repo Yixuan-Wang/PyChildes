@@ -12,6 +12,7 @@ from functools import wraps
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+import morphosyntax
 from chat_config import ChatConfig as ChatConfig
 from chat_output import ChatSink, ChatSinkJSON, ChatSinkText
 from unit_turn import UnitTurn
@@ -1046,26 +1047,39 @@ def process_cha_file(input_file: str, output_file: str, config_path: str) -> Non
                                 unit_turn.update(speaker + ' ' + line, 'utt')
 
                 # Dependent_Tier
-                # TODO: For now only process %act and %sit
+                # TODO: For now only process %mor and %gra and the legacy %act & friends code.
                 elif line.startswith('%'):
-                    # Notes: Feels a bit interwined with process_dependent_tier, especially for none act tiers
-                    # Default: During
-                    if '<' not in line:
-                        keep_data, tier, line = process_dependent_tier(line, config)
-                        if keep_data:
-                            unit_turn.update(line, 'env_dur')
+                    if line.startswith('%mor'):
+                        content = line.replace('%mor:\t', '').strip()
+                        morpho = morphosyntax.parse_morphological(content)
+                        if morpho:
+                            unit_turn.morphological = morpho
 
-                    # Process the Synchrony Relations (11.2)
+                    elif line.startswith('%gra'):
+                        content = line.replace('%gra:\t', '').strip()
+                        syntax = morphosyntax.parse_grammatical_relations(content)
+                        if syntax:
+                            unit_turn.grammatical_relations = syntax
+
                     else:
-                        ordered_events = split_sync_rel(line, config)
-                        for order, events in ordered_events.items():
-                            for event in events:
-                                event = '%act:\t' + event
-                                keep_data, tier, line = process_dependent_tier(
-                                    event, config
-                                )
-                                if keep_data:
-                                    unit_turn.update(line, order)
+                        # Notes: Feels a bit interwined with process_dependent_tier, especially for none act tiers
+                        # Default: During
+                        if '<' not in line:
+                            keep_data, tier, line = process_dependent_tier(line, config)
+                            if keep_data:
+                                unit_turn.update(line, 'env_dur')
+
+                        # Process the Synchrony Relations (11.2)
+                        else:
+                            ordered_events = split_sync_rel(line, config)
+                            for order, events in ordered_events.items():
+                                for event in events:
+                                    event = '%act:\t' + event
+                                    keep_data, tier, line = process_dependent_tier(
+                                        event, config
+                                    )
+                                    if keep_data:
+                                        unit_turn.update(line, order)
 
                 else:
                     raise DataIntegrityError(data=line)
