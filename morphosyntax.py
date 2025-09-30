@@ -102,13 +102,13 @@ class MorphoComponentBase(TypedDict):
     index_word: int
     index_clitic: int
     lemma: str
+    pos: str
 
 
 @final
 class MorphoComponentWord(MorphoComponentBase):
     """A normal, single word morphological component."""
     kind: Literal['word']
-    pos: str
     features: MorphoFeature
 
 
@@ -149,6 +149,7 @@ def parse_morphological_component(
                 'index_clitic': index_clitic,
                 'kind': 'punctuation',
                 'lemma': ',',
+                'pos': 'punct',
             }
         )
 
@@ -162,6 +163,7 @@ def parse_morphological_component(
                 'index_clitic': index_clitic,
                 'kind': 'punctuation',
                 'lemma': lemma,
+                'pos': 'punct',
             }
         )
     else:
@@ -170,8 +172,12 @@ def parse_morphological_component(
         if morph_form.find('+') != -1:
             # This is a compound word, the pipe_split is not fully
             # e.g. n|+n|milk+n|shake-PL -> n|+n, milk+n|shake-PL
+            #      n|+v|break+n|fast
 
-            pos_1 = pipe_splits[0]
+            pos_total_and_1 = pipe_splits[0]
+
+            pos_total, _, pos_1 = pos_total_and_1.partition('|+')
+
             morph_form_1, _, remainder = morph_form.partition('+')
             pos_2, morph_form_2 = RE_SPLIT_PIPE.split(remainder, maxsplit=1)
 
@@ -182,6 +188,7 @@ def parse_morphological_component(
                 {
                     'kind': 'compound',
                     'lemma': f'{lemma_1}{lemma_2}',
+                    'pos': pos_total,
                     'index_word': index_word,
                     'index_clitic': index_clitic,
                     'components': [
