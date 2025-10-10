@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from utils import DataIntegrityError
 
 if TYPE_CHECKING:
-    from morphosyntax import GrammaticalRelation, MorphoComponent
+    from morphosyntax import GrammaticalRelation, Morphological
 
 
 class UnitTurn:
@@ -62,12 +62,12 @@ class UnitTurn:
     Environmental events occurring after the utterance.\
     """
 
-    grammatical_relations: list[tuple[int, int, GrammaticalRelation]]
+    grammatical_relations: GrammaticalRelation
     """\
     Grammatical relations (edges in dependency grammar) associated with the utterance.\
     """
 
-    morphological: list[tuple[int, MorphoComponent]]
+    morphological: Morphological
     """\
     Morphological components (vertices in dependency grammar) associated with the utterance.\
     """
@@ -86,8 +86,18 @@ class UnitTurn:
         self.env_dur = []
         self.env_aft = []
 
-        self.grammatical_relations = []
-        self.morphological = []
+        self.grammatical_relations = {
+            'from_index': [],
+            'to_index': [],
+            'rel': [],
+        }
+        self.morphological = {
+            'index': [],
+            'kind': [],
+            'lemma': [],
+            'pos': [],
+            'metadata': [],
+        }
 
     def update(self, content: str, attribute: str) -> None:
         """Append content to the specified class attribute if it exists.
@@ -132,12 +142,12 @@ class UnitTurn:
         output.extend(self.env_aft)
         return output
 
-    def to_morphosyntax_graph(self) -> tuple[list[tuple[int, MorphoComponent]], list[tuple[int, int, GrammaticalRelation]]]:
+    def to_morphosyntax_graph(self) -> tuple[Morphological, GrammaticalRelation]:
         """Get the morphological components and grammatical relations.
 
         Returns:
             morphosyntax_graph: A tuple containing two lists:
-            - The first list contains morphological components as tuples of (index, MorphoComponent).
-            - The second list contains grammatical relations as tuples of (from_index, to_index, GrammaticalRelation).
+            - The first list contains morphological components, where `index` is the node ID.
+            - The second list contains grammatical relations, where `from_index` and `to_index` are node IDs.
         """
         return self.morphological, self.grammatical_relations

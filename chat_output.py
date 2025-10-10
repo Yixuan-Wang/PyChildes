@@ -145,8 +145,8 @@ class ChatSinkJSON(ChatSink):
             if turn.grammatical_relations and turn.morphological:
                 graph = {
                     'graph': {
-                        'nodes': turn.morphological,
-                        'edges': turn.grammatical_relations,
+                        'morph': turn.morphological,
+                        'syntax': turn.grammatical_relations,
                     }
                 }
             else:
