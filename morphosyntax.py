@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Literal, TypedDict
+from typing import Any, Literal, TypedDict
 
 from utils import DataIntegrityError
 
@@ -55,55 +55,58 @@ def parse_grammatical_relations(content: str) -> GrammaticalRelation:
 class MorphoFeature(TypedDict):
     """A morphological feature dictionary.
 
-    - `implicit` are irregular morphological features (with `&` tag).
-    - `explicit` are regular morphemes (with `-` tag).
+    - `feature` are irregular morphological features (with `&` tag).
+    - `suffix` are regular morphemes (with `-` tag).
+    - `prefix` are regular morphemes (with `#` tag).
     - `explanation` are explanations (with `=` tag).
     """
-    implicit: list[str]  # & tags
-    explicit: list[str]  # - tags
+    feature: list[str]  # & tags
+    suffix: list[str]  # - tags
+    prefix: list[str]  # # tags
     explanation: list[str]  # = tags
 
 
-RE_SPLIT_PIPE = re.compile(r'(?<!^)\|(?!\+|$)')
+# RE_SPLIT_PIPE = re.compile(r'(?<!^)\|(?!\+|$)')
 RE_SPLIT_CLITIC = re.compile(r'(?<!^)~(?!$)')
-RE_SPLIT_MORPH_FEATURE = re.compile(
-    r'([&=-])'
-)  # Must use capture group to keep the delimiters
+# RE_SPLIT_MORPH_FEATURE = re.compile(
+#     r'([&=-#])'
+# )  # Must use capture group to keep the delimiters
 
 
-def _parse_morphological_form(morph_form: str) -> tuple[str, MorphoFeature]:
-    """Separate & and - tags from the lemma in a morphological form.
+# def _parse_morphological_form(morph_form: str) -> tuple[str, MorphoFeature]:
+#     """Separate & and - tags from the lemma in a morphological form.
 
-    - `&` tags indicates irregular morphological features.
-    - `-` tags indicates regular morphemes (usually segmentable).
-    - `=` tags indicates explanation.
-    """
-    feature_splits = RE_SPLIT_MORPH_FEATURE.split(morph_form)
-    lemma = ''
-    features: MorphoFeature = {
-        'implicit': [],
-        'explicit': [],
-        'explanation': [],
-    }
+#     - `&` tags indicates irregular morphological features.
+#     - `-` tags indicates suffixes.
+#     - `#` tags indicates prefixes.
+#     - `=` tags indicates explanation.
+#     """
+#     feature_splits = RE_SPLIT_MORPH_FEATURE.split(morph_form)
+#     lemma = ''
+#     features: MorphoFeature = {
+#         'implicit': [],
+#         'explicit': [],
+#         'explanation': [],
+#     }
 
-    current_delimiter: None | Literal['&', '-', '='] = None
+#     current_delimiter: None | Literal['&', '-', '='] = None
 
-    for part in feature_splits:
-        if part in {'&', '-', '='}:
-            current_delimiter = part  # type: ignore
-        else:
-            if current_delimiter is None:
-                lemma = part
-            elif current_delimiter == '&':
-                features['implicit'].append(part)
-            elif current_delimiter == '-':
-                features['explicit'].append(part)
-            elif current_delimiter == '=':
-                features['explanation'].append(part)
-            else:
-                pass
+#     for part in feature_splits:
+#         if part in {'&', '-', '='}:
+#             current_delimiter = part  # type: ignore
+#         else:
+#             if current_delimiter is None:
+#                 lemma = part
+#             elif current_delimiter == '&':
+#                 features['implicit'].append(part)
+#             elif current_delimiter == '-':
+#                 features['explicit'].append(part)
+#             elif current_delimiter == '=':
+#                 features['explanation'].append(part)
+#             else:
+#                 pass
 
-    return lemma, features
+#     return lemma, features
 
 
 class Morphological(TypedDict):
@@ -124,91 +127,127 @@ class MorphoComponent(TypedDict):
     metadata: str  # JSON string of additional metadata
 
 
+MORPHO_LEXICAL_UNIT = {
+    'marker_prefix': r'#',
+    'marker_pos': r'\|',
+    'marker_suffix': r'-',
+    'marker_feature': r'&',
+    'marker_explanation': r'=',
+    'marker_subpos': r':',
+    'marker_compound': r'\+',
+}
+
+REGEX_LEXICAL_UNIT = re.compile('({})'.format('|'.join(MORPHO_LEXICAL_UNIT.values())))
+
+
+def lex_morphological_component(input: str) -> list[str]:
+    """Lex a morphological component into its atomic parts."""
+    splits = list(filter(None, REGEX_LEXICAL_UNIT.split(input)))
+    return splits
+
+
 def parse_morphological_component(
-    component: str, *, index: int, index_word: int, index_clitic: int
+    input: str, *,  index: int, index_word: int, index_clitic: int
 ) -> MorphoComponent:
     """Parse a single morphological component, which may be a word, punctuation, or compound word."""
-    if component == 'cm|cm':
-        return {
-            'index': index,
-            'kind': 'punctuation',
-            'lemma': ',',
-            'pos': 'punct',
-            'metadata': json.dumps({
-                'index_word': index_word,
-                'index_clitic': index_clitic,
-            })
-        }
+    lemma = ''
+    buffer = ''
 
-    pipe_splits = RE_SPLIT_PIPE.split(component, maxsplit=1)
+    pos = ''
+    feature = MorphoFeature(
+        feature=[],
+        suffix=[],
+        prefix=[],
+        explanation=[],
+    )
+    metadata: dict[str, Any] = {
+        'index_word': index_word,
+        'index_clitic': index_clitic,
+    }
 
-    if len(pipe_splits) < 2:
-        lemma = pipe_splits[0]
-        return {
-            'index': index,
-            'kind': 'punctuation',
-            'lemma': lemma,
-            'pos': 'punct',
-            'metadata': json.dumps({
-                'index_word': index_word,
-                'index_clitic': index_clitic,
-            })
-        }
+    list_lex = lex_morphological_component(input)
+    idx_lex = 0
+    is_compound = False
+    is_writing_lemma = False
+
+    try:
+        while idx_lex < len(list_lex):
+            lex = list_lex[idx_lex]
+
+            if lex == MORPHO_LEXICAL_UNIT['marker_prefix']:
+                feature['prefix'].append(list_lex[idx_lex - 1])
+                idx_lex += 1
+            elif lex == '|':
+                pos = buffer
+                is_writing_lemma = True
+                idx_lex += 1
+            elif lex == MORPHO_LEXICAL_UNIT['marker_subpos']:
+                metadata['subpos'] = list_lex[idx_lex + 1]
+                idx_lex += 2
+            elif lex == MORPHO_LEXICAL_UNIT['marker_suffix']:
+                feature['suffix'].append(list_lex[idx_lex + 1])
+                idx_lex += 2
+            elif lex == MORPHO_LEXICAL_UNIT['marker_feature']:
+                feature['feature'].append(list_lex[idx_lex + 1])
+                idx_lex += 2
+            elif lex == MORPHO_LEXICAL_UNIT['marker_explanation']:
+                feature['explanation'].append(list_lex[idx_lex + 1])
+                idx_lex += 2
+            elif lex == '+':
+                if idx_lex == 0:
+                    # This is a leading + punctuation
+                    break
+
+                # pos|compound+pos|compound
+                is_compound = True
+                is_writing_lemma = True
+                compound = []
+                while idx_lex < len(list_lex) and list_lex[idx_lex] == '+':
+                    assert list_lex[idx_lex + 2] == '|', 'Unhandled compound morphological component'
+                    compound_pos, compound_lemma = list_lex[idx_lex + 1], list_lex[idx_lex + 3]
+                    compound.append({
+                        'pos': compound_pos,
+                        'lemma': compound_lemma,
+                    })
+                    lemma += compound_lemma
+
+                    idx_lex += 4
+                metadata['components'] = compound
+                is_writing_lemma = False
+            else:
+                if is_writing_lemma:
+                    lemma = lex
+                else:
+                    buffer = lex
+
+                idx_lex += 1
+    except IndexError:
+        raise DataIntegrityError(f'Invalid morphological component: {input}')
+
+    if not lemma:
+        kind = 'punctuation'
+        pos = 'punct'
+        lemma = input
+    elif pos == 'cm':
+        kind = 'punctuation'
+        pos = 'punct'
+        lemma = ','
     else:
-        morph_form = pipe_splits[1]
+        metadata['features'] = feature
+        if is_compound:
+            kind = 'compound'
+        elif pos:
+            kind = 'word'
+        else:
+            raise DataIntegrityError(f'Invalid morphological component, not of any kind: {input}')
 
-        if morph_form.find('+') != -1:
-            # This is a compound word, the pipe_split is not fully
-            # e.g. n|+n|milk+n|shake-PL -> n|+n, milk+n|shake-PL
-            #      n|+v|break+n|fast
-
-            pos_total_and_1 = pipe_splits[0]
-
-            pos_total, _, pos_1 = pos_total_and_1.partition('|+')
-
-            morph_form_1, _, remainder = morph_form.partition('+')
-            pos_2, morph_form_2 = RE_SPLIT_PIPE.split(remainder, maxsplit=1)
-
-            lemma_1, features_1 = _parse_morphological_form(morph_form_1)
-            lemma_2, features_2 = _parse_morphological_form(morph_form_2)
-
-            return {
-                'index': index,
-                'kind': 'compound',
-                'lemma': f'{lemma_1}{lemma_2}',
-                'pos': pos_total,
-                'metadata': json.dumps({
-                    'index_word': index_word,
-                    'index_clitic': index_clitic,
-                    'components': [
-                        {
-                            'pos': pos_1,
-                            'lemma': lemma_1,
-                            'features': features_1,
-                        },
-                        {
-                            'pos': pos_2,
-                            'lemma': lemma_2,
-                            'features': features_2,
-                        },
-                    ],
-                })
-            }
-
-        lemma, features = _parse_morphological_form(morph_form)
-        value = MorphoComponent({
-            'index': index,
-            'kind': 'word',
-            'pos': pipe_splits[0],
-            'lemma': lemma,
-            'metadata': json.dumps({
-                'index_word': index_word,
-                'index_clitic': index_clitic,
-                'features': features,
-            }),
-        })
-
-        return value
+    return MorphoComponent({
+        'index': index,
+        'kind': kind,
+        'lemma': lemma,
+        'pos': pos,
+        'metadata': json.dumps(metadata),
+    })
 
 
 def parse_morphological(content: str) -> Morphological:
@@ -221,11 +260,12 @@ def parse_morphological(content: str) -> Morphological:
     ```
 
     Examples:
-    ```
+    ```plaintext
     pro:sub|he~aux|be&3S part|go&PRESP~inf|to v|go prep|for det:art|a n|ride prep|with det:art|the n|child&PL .
     n|+n|milk+n|shake-PL .
     co|mhm=yes .
     v|take pro:per|it prep|off det:art|the n|fire adj|care&dn-FUL-LY coord|and v|put&ZERO pro:per|it prep|on det:art|the n|plate .
+    mod|must re#v|build .
     ```
 
     Returns:
