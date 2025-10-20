@@ -66,49 +66,6 @@ class MorphoFeature(TypedDict):
     explanation: list[str]  # = tags
 
 
-# RE_SPLIT_PIPE = re.compile(r'(?<!^)\|(?!\+|$)')
-RE_SPLIT_CLITIC = re.compile(r'(?<!^)~(?!$)')
-# RE_SPLIT_MORPH_FEATURE = re.compile(
-#     r'([&=-#])'
-# )  # Must use capture group to keep the delimiters
-
-
-# def _parse_morphological_form(morph_form: str) -> tuple[str, MorphoFeature]:
-#     """Separate & and - tags from the lemma in a morphological form.
-
-#     - `&` tags indicates irregular morphological features.
-#     - `-` tags indicates suffixes.
-#     - `#` tags indicates prefixes.
-#     - `=` tags indicates explanation.
-#     """
-#     feature_splits = RE_SPLIT_MORPH_FEATURE.split(morph_form)
-#     lemma = ''
-#     features: MorphoFeature = {
-#         'implicit': [],
-#         'explicit': [],
-#         'explanation': [],
-#     }
-
-#     current_delimiter: None | Literal['&', '-', '='] = None
-
-#     for part in feature_splits:
-#         if part in {'&', '-', '='}:
-#             current_delimiter = part  # type: ignore
-#         else:
-#             if current_delimiter is None:
-#                 lemma = part
-#             elif current_delimiter == '&':
-#                 features['implicit'].append(part)
-#             elif current_delimiter == '-':
-#                 features['explicit'].append(part)
-#             elif current_delimiter == '=':
-#                 features['explanation'].append(part)
-#             else:
-#                 pass
-
-#     return lemma, features
-
-
 class Morphological(TypedDict):
     """A morphological node dictionary."""
     index: list[int]
@@ -135,6 +92,7 @@ MORPHO_LEXICAL_UNIT = {
     'marker_explanation': r'=',
     'marker_subpos': r':',
     'marker_compound': r'\+',
+    'marker_omitted': r'0+',
 }
 
 REGEX_LEXICAL_UNIT = re.compile('({})'.format('|'.join(MORPHO_LEXICAL_UNIT.values())))
@@ -147,7 +105,7 @@ def lex_morphological_component(input: str) -> list[str]:
 
 
 def parse_morphological_component(
-    input: str, *,  index: int, index_word: int, index_clitic: int
+    input: str, *, index: int, index_word: int, index_clitic: int
 ) -> MorphoComponent:
     """Parse a single morphological component, which may be a word, punctuation, or compound word."""
     lemma = ''
@@ -214,6 +172,11 @@ def parse_morphological_component(
                     idx_lex += 4
                 metadata['components'] = compound
                 is_writing_lemma = False
+            elif lex.startswith('0'):
+                # This is a hypothetical addition of an omitted morpheme.
+                # Level can be 1 or 2 zeros.
+                metadata['omitted'] = len(lex)
+                idx_lex += 1
             else:
                 if is_writing_lemma:
                     lemma = lex
@@ -248,6 +211,9 @@ def parse_morphological_component(
         'pos': pos,
         'metadata': json.dumps(metadata),
     })
+
+
+RE_SPLIT_CLITIC = re.compile(r'(?<!^)~(?!$)')
 
 
 def parse_morphological(content: str) -> Morphological:
