@@ -11,6 +11,7 @@ import prepare_childes as pc
 # co|mhm=yes .
 # v|take pro:per|it prep|off det:art|the n|fire adj|care&dn-FUL-LY coord|and v|put&ZERO pro:per|it prep|on det:art|the n|plate .
 # mod|must re#v|build .
+# pro:int|what_about det:dem|these n|guy-PL ?
 
 
 class TestMorphosyntax(unittest.TestCase):
@@ -51,6 +52,11 @@ class TestMorphosyntax(unittest.TestCase):
         self.assertEqual(
             ['re', '#', 'v', '|', 'build'],
             pc.morphosyntax.lex_morphological_component('re#v|build')
+        )
+
+        self.assertEqual(
+            ['pro', ':', 'int', '|', 'what', '_', 'about'],
+            pc.morphosyntax.lex_morphological_component('pro:int|what_about')
         )
 
     def test_parse_morphological_component(self):
@@ -237,6 +243,28 @@ class TestMorphosyntax(unittest.TestCase):
                         'feature': [],
                         'suffix': [],
                         'prefix': ['re'],
+                        'explanation': [],
+                    },
+                }),
+            })
+        )
+
+        # Test multiword component
+        self.assertEqual(
+            pc.morphosyntax.parse_morphological_component('pro:int|what_about', index=9, index_word=9, index_clitic=0),
+            pc.morphosyntax.MorphoComponent({
+                'index': 9,
+                'kind': 'word',
+                'lemma': 'what about',
+                'pos': 'pro',
+                'metadata': json.dumps({
+                    'index_word': 9,
+                    'index_clitic': 0,
+                    'subpos': 'int',
+                    'features': {
+                        'feature': [],
+                        'suffix': [],
+                        'prefix': [],
                         'explanation': [],
                     },
                 }),

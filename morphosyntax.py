@@ -92,6 +92,7 @@ MORPHO_LEXICAL_UNIT = {
     'marker_explanation': r'=',
     'marker_subpos': r':',
     'marker_compound': r'\+',
+    'marker_multiword': r'_',
     'marker_omitted': r'0+',
 }
 
@@ -151,6 +152,9 @@ def parse_morphological_component(
             elif lex == MORPHO_LEXICAL_UNIT['marker_explanation']:
                 feature['explanation'].append(list_lex[idx_lex + 1])
                 idx_lex += 2
+            elif lex == MORPHO_LEXICAL_UNIT['marker_multiword']:
+                lemma += ' '
+                idx_lex += 1
             elif lex == '+':
                 if idx_lex == 0:
                     # This is a leading + punctuation
@@ -179,8 +183,10 @@ def parse_morphological_component(
                 idx_lex += 1
             else:
                 if is_writing_lemma:
-                    lemma = lex
+                    # Lemma can be non-contigous due to multiword `_` marker.
+                    lemma += lex
                 else:
+                    # Buffer of pos cannot be multi-part.
                     buffer = lex
 
                 idx_lex += 1
@@ -191,10 +197,15 @@ def parse_morphological_component(
         kind = 'punctuation'
         pos = 'punct'
         lemma = input
-    elif pos == 'cm':
+    elif pos in {'cm', 'end', 'beg'}:
         kind = 'punctuation'
+        metadata['comma_type'] = pos
         pos = 'punct'
         lemma = ','
+    elif pos == 'zero':
+        kind = 'punctuation'
+        pos = 'punct'
+        lemma = '<unk>'  # TODO: Do not hard code <unk>
     else:
         metadata['features'] = feature
         if is_compound:
